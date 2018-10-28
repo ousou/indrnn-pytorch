@@ -24,10 +24,29 @@ class SingleLayerIndRNN(nn.Module):
 
     def forward(self, x):
         input_count = x.size(0)
-        h = torch.zeros(input_count, self.input_size)
+        h = torch.zeros(input_count, self.hidden_size)
 
         for i in range(x.size(1)):
             x_i = x[:, i, :]
             h = self.cell(x_i, h)
+
+        return h
+
+class TwoLayerIndRNN(nn.Module):
+    def __init__(self, input_size, hidden_size):
+        super(TwoLayerIndRNN, self).__init__()
+        self.cell = IndRNNCell(input_size, hidden_size)
+        self.input_size = input_size
+        self.hidden_size = hidden_size
+        self.fc_layer = nn.Linear(hidden_size, hidden_size)
+
+    def forward(self, x):
+        input_count = x.size(0)
+        h = torch.zeros(input_count, self.hidden_size)
+
+        for i in range(x.size(1)):
+            x_i = x[:, i, :]
+            h = self.cell(x_i, h)
+            h = self.fc_layer(h)
 
         return h
