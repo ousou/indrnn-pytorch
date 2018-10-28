@@ -1,4 +1,4 @@
-from indrnn import SingleLayerIndRNN, TwoLayerIndRNN
+from indrnn import TwoLayerIndRNN
 import torch
 import torch.nn as nn
 import argparse
@@ -47,23 +47,23 @@ def main():
     # Training settings
     parser = argparse.ArgumentParser(description='PyTorch IndRNN adding problem Example')
     parser.add_argument('--batch-size', type=int, default=32, metavar='N',
-                        help='input batch size for training (default: 64)')
+                        help='input batch size for training (default: 32)')
     parser.add_argument('--test-batch-size', type=int, default=1000, metavar='N',
                         help='input batch size for testing (default: 1000)')
     parser.add_argument('--steps', type=int, default=50000, metavar='N',
                         help='number of training steps to take (default: 50000)')
-    parser.add_argument('--lr', type=float, default=1e-4, metavar='LR',
-                        help='learning rate (default: 1e-4)')
+    parser.add_argument('--lr', type=float, default=1e-3, metavar='LR',
+                        help='learning rate (default: 1e-3)')
     parser.add_argument('--no-cuda', action='store_true', default=False,
                         help='disables CUDA training')
     parser.add_argument('--seed', type=int, default=1, metavar='S',
                         help='random seed (default: 1)')
-    parser.add_argument('--log-interval', type=int, default=10, metavar='N',
+    parser.add_argument('--log-interval', type=int, default=1000, metavar='N',
                         help='how many batches to wait before logging training status')
-    parser.add_argument('--sequence-length', type=int, default=10, metavar='N',
+    parser.add_argument('--sequence-length', type=int, default=100, metavar='N',
                         help='Length of training sequence')
-    parser.add_argument('--hidden-size', type=int, default=5, metavar='N',
-                        help='Size of hidden layer in IndRNN')
+    parser.add_argument('--hidden-size', type=int, default=64, metavar='N',
+                        help='Size of hidden layer in IndRNN (default: 64)')
     args = parser.parse_args()
     print('Training with arguments', args)
     use_cuda = not args.no_cuda and torch.cuda.is_available()
@@ -76,7 +76,7 @@ def main():
     for steps in range(1, args.steps + 1):
         x, y = generate_data(args.sequence_length, args.batch_size, device)
         train(model, x, y, loss, optimizer)
-        if steps % 1000 == 0:
+        if steps % args.log_interval == 0:
             x_test, y_test = generate_data(args.sequence_length, args.test_batch_size, device)
             test_loss = test(model, x_test, y_test, loss)
             print('Test Step: {} \tLoss: {:.6f}'.format(
@@ -86,7 +86,6 @@ def main():
             print('Decreasing learning rate to', lr)
             for param_group in optimizer.param_groups:
                 param_group['lr'] = lr
-
 
 
 if __name__ == '__main__':
