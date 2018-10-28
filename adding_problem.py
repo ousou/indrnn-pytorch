@@ -1,4 +1,4 @@
-from indrnn import TwoLayerIndRNN
+from indrnn import SingleLayerIndRNN, TwoLayerIndRNN
 import torch
 import torch.nn as nn
 import argparse
@@ -65,6 +65,7 @@ def main():
     parser.add_argument('--hidden-size', type=int, default=5, metavar='N',
                         help='Size of hidden layer in IndRNN')
     args = parser.parse_args()
+    print('Training with arguments', args)
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
@@ -74,12 +75,10 @@ def main():
     lr = args.lr
     for steps in range(1, args.steps + 1):
         x, y = generate_data(args.sequence_length, args.batch_size, device)
-        train_loss = train(model, x, y, loss, optimizer)
+        train(model, x, y, loss, optimizer)
         if steps % 1000 == 0:
             x_test, y_test = generate_data(args.sequence_length, args.test_batch_size, device)
             test_loss = test(model, x_test, y_test, loss)
-            print('Train Step: {} \tLoss: {:.6f}'.format(
-                steps, train_loss))
             print('Test Step: {} \tLoss: {:.6f}'.format(
                 steps, test_loss))
         if steps % 10000 == 0:
