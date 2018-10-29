@@ -75,36 +75,56 @@ def main():
                         help='Length of training sequence')
     parser.add_argument('--hidden-size', type=int, default=64, metavar='N',
                         help='Size of hidden layer in IndRNN (default: 64)')
+    parser.add_argument('--comparison-model', default='none', metavar='N',
+                        help='Comparison model to train on the same data as the IndRNN.'
+                             'Options: rnn-tanh, rnn-relu, lstm')
     args = parser.parse_args()
     print('Training with arguments', args)
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
+
+    models_to_train = {}
     indrnn_model = AddingProblemIndRNNModel(args.hidden_size)
-    rnn_model = AddingProblemRNNModel(nn.RNN(2, args.hidden_size,
-                                          nonlinearity='relu', batch_first=True),
-                                   args.hidden_size)
     indrnn_optimizer = torch.optim.Adam(lr=args.lr, params=indrnn_model.parameters())
-    rnn_optimizer = torch.optim.Adam(lr=args.lr, params=rnn_model.parameters())
+    models_to_train['IndRNN'] = (indrnn_model, indrnn_optimizer)
+
+    if args.comparison_model == 'rnn-tanh':
+        rnn_model = AddingProblemRNNModel(nn.RNN(2, args.hidden_size,
+                                                 nonlinearity='tanh', batch_first=True),
+                                          args.hidden_size)
+        rnn_optimizer = torch.optim.Adam(lr=args.lr, params=rnn_model.parameters())
+        models_to_train['RNN-tanh'] = (rnn_model, rnn_optimizer)
+    elif args.comparison_model == 'rnn-relu':
+        rnn_model = AddingProblemRNNModel(nn.RNN(2, args.hidden_size,
+                                                 nonlinearity='relu', batch_first=True),
+                                          args.hidden_size)
+        rnn_optimizer = torch.optim.Adam(lr=args.lr, params=rnn_model.parameters())
+        models_to_train['RNN-ReLU'] = (rnn_model, rnn_optimizer)
+    elif args.comparison_model == 'lstm':
+        lstm_model = AddingProblemRNNModel(nn.LSTM(2, args.hidden_size, batch_first=True),
+                                       args.hidden_size)
+        lstm_optimizer = torch.optim.Adam(lr=args.lr, params=lstm_model.parameters())
+        models_to_train['LSTM'] = (lstm_model, lstm_optimizer)
+
     loss = nn.MSELoss()
     lr = args.lr
     for steps in range(1, args.steps + 1):
         x, y = generate_data(args.sequence_length, args.batch_size, device)
-        train(indrnn_model, x, y, loss, indrnn_optimizer)
-        train(rnn_model, x, y, loss, rnn_optimizer)
+        for model, optimizer in models_to_train.values():
+            train(model, x, y, loss, optimizer)
         if steps % args.log_interval == 0:
             x_test, y_test = generate_data(args.sequence_length, args.test_batch_size, device)
-            test_loss_indrnn = test(indrnn_model, x_test, y_test, loss)
-            print('Test Step: {} \t IndRNN Loss: {:.6f}'.format(
-                steps, test_loss_indrnn))
-            test_loss_rnn = test(rnn_model, x_test, y_test, loss)
-            print('Test Step: {} \t RNN Loss: {:.6f}'.format(
-                steps, test_loss_rnn))
+            for name, (model, _) in models_to_train.items():
+                test_loss = test(model, x_test, y_test, loss)
+                print('Test Step: {} \t {} Loss: {:.6f}'.format(
+                    steps, name, test_loss))
         if steps % 10000 == 0:
             lr = lr / 10
             print('Decreasing learning rate to', lr)
-            for param_group in indrnn_optimizer.param_groups:
-                param_group['lr'] = lr
+            for _, optimizer in models_to_train.values():
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = lr
 
 
 if __name__ == '__main__':
