@@ -8,11 +8,10 @@ class IndRNNCell(nn.Module):
         super(IndRNNCell, self).__init__()
         self.input_fwd = nn.Linear(input_size, hidden_size)
         self.hidden_vector = nn.Parameter(torch.rand(1, hidden_size) - 0.5)
-        self.bias = nn.Parameter(torch.rand(hidden_size) - 0.5)
         self.activation = F.relu
 
     def forward(self, x, h):
-        return self.activation(self.input_fwd(x) + self.hidden_vector * h + self.bias)
+        return self.activation(self.input_fwd(x) + self.hidden_vector * h)
 
 
 class SingleLayerIndRNN(nn.Module):
