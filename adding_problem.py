@@ -4,16 +4,27 @@ import torch.nn as nn
 import argparse
 
 
-class AddingProblemIndRNN(nn.Module):
+class AddingProblemIndRNNModel(nn.Module):
 
-    def __init__(self, hidden_size):
-        super(AddingProblemIndRNN, self).__init__()
+    def __init__(self,  hidden_size):
+        super(AddingProblemIndRNNModel, self).__init__()
         self.indrnn = TwoLayerIndRNN(2, hidden_size)
         self.final_layer = nn.Linear(hidden_size, 1)
 
     def forward(self, x):
         hidden_state = self.indrnn(x)
         return self.final_layer(hidden_state).squeeze()
+
+class AddingProblemRNNModel(nn.Module):
+
+    def __init__(self, rnn_model, hidden_size):
+        super(AddingProblemRNNModel, self).__init__()
+        self.rnn_model = rnn_model
+        self.final_layer = nn.Linear(hidden_size, 1)
+
+    def forward(self, x):
+        output, hn = self.rnn_model(x)
+        return self.final_layer(hn).squeeze()
 
 def train(model, data, target, loss_fn, optimizer):
     model.train()
@@ -69,22 +80,30 @@ def main():
     use_cuda = not args.no_cuda and torch.cuda.is_available()
     torch.manual_seed(args.seed)
     device = torch.device("cuda" if use_cuda else "cpu")
-    model = AddingProblemIndRNN(args.hidden_size)
-    optimizer = torch.optim.Adam(lr=args.lr, params=model.parameters())
+    indrnn_model = AddingProblemIndRNNModel(args.hidden_size)
+    rnn_model = AddingProblemRNNModel(nn.RNN(2, args.hidden_size,
+                                          nonlinearity='relu', batch_first=True),
+                                   args.hidden_size)
+    indrnn_optimizer = torch.optim.Adam(lr=args.lr, params=indrnn_model.parameters())
+    rnn_optimizer = torch.optim.Adam(lr=args.lr, params=rnn_model.parameters())
     loss = nn.MSELoss()
     lr = args.lr
     for steps in range(1, args.steps + 1):
         x, y = generate_data(args.sequence_length, args.batch_size, device)
-        train(model, x, y, loss, optimizer)
+        train(indrnn_model, x, y, loss, indrnn_optimizer)
+        train(rnn_model, x, y, loss, rnn_optimizer)
         if steps % args.log_interval == 0:
             x_test, y_test = generate_data(args.sequence_length, args.test_batch_size, device)
-            test_loss = test(model, x_test, y_test, loss)
-            print('Test Step: {} \tLoss: {:.6f}'.format(
-                steps, test_loss))
+            test_loss_indrnn = test(indrnn_model, x_test, y_test, loss)
+            print('Test Step: {} \t IndRNN Loss: {:.6f}'.format(
+                steps, test_loss_indrnn))
+            test_loss_rnn = test(rnn_model, x_test, y_test, loss)
+            print('Test Step: {} \t RNN Loss: {:.6f}'.format(
+                steps, test_loss_rnn))
         if steps % 10000 == 0:
             lr = lr / 10
             print('Decreasing learning rate to', lr)
-            for param_group in optimizer.param_groups:
+            for param_group in indrnn_optimizer.param_groups:
                 param_group['lr'] = lr
 
 
